@@ -83,6 +83,10 @@ class BaseConversationalRetrievalChain(Chain):
     response_if_no_docs_found: Optional[str]
     """If specified, the chain will return a fixed response if no docs 
     are found for the question. """
+    filter: Optional[Dict[str, Any]] = None
+    """If specified, the chain will pass the filter to the retriever and
+    overrule the retriever's filter. This only works if the retriever has
+    it's own built-in filtering functionality."""
 
     class Config:
         """Configuration for this pydantic object."""
@@ -215,6 +219,12 @@ class BaseConversationalRetrievalChain(Chain):
             output["generated_question"] = new_question
         return output
 
+    def apply_filter(self, filter_criteria: dict[str, Any] = None) -> None:
+        self.filter = filter_criteria
+
+    def remove_filter(self) -> None:
+        self.filter = None
+
     def save(self, file_path: Union[Path, str]) -> None:
         if self.get_chat_history:
             raise ValueError("Chain not saveable when `get_chat_history` is not None.")
@@ -302,9 +312,15 @@ class ConversationalRetrievalChain(BaseConversationalRetrievalChain):
         run_manager: CallbackManagerForChainRun,
     ) -> List[Document]:
         """Get docs."""
-        docs = self.retriever.get_relevant_documents(
-            question, callbacks=run_manager.get_child()
-        )
+        if self.filter is not None:
+            docs = self.retriever.get_relevant_documents(
+                question, callbacks=run_manager.get_child(), filter=self.filter
+            )
+        else:
+            docs = self.retriever.get_relevant_documents(
+                question, callbacks=run_manager.get_child()
+            )
+
         return self._reduce_tokens_below_limit(docs)
 
     async def _aget_docs(
@@ -315,9 +331,15 @@ class ConversationalRetrievalChain(BaseConversationalRetrievalChain):
         run_manager: AsyncCallbackManagerForChainRun,
     ) -> List[Document]:
         """Get docs."""
-        docs = await self.retriever.aget_relevant_documents(
-            question, callbacks=run_manager.get_child()
-        )
+        if self.filter is not None:
+            docs = await self.retriever.aget_relevant_documents(
+                question, callbacks=run_manager.get_child(), filter=self.filter
+            )
+        else:
+            docs = await self.retriever.aget_relevant_documents(
+                question, callbacks=run_manager.get_child()
+            )
+
         return self._reduce_tokens_below_limit(docs)
 
     @classmethod

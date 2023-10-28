@@ -579,42 +579,58 @@ class VectorStoreRetriever(BaseRetriever):
         return values
 
     def _get_relevant_documents(
-        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+        filter: Optional[Dict[str, Any]] = None,
     ) -> List[Document]:
+        if filter is not None:
+            kwargs = self.search_kwargs.copy()
+            kwargs["filter"] = filter
+        else:
+            kwargs = self.search_kwargs
+
         if self.search_type == "similarity":
-            docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
+            docs = self.vectorstore.similarity_search(query, **kwargs)
         elif self.search_type == "similarity_score_threshold":
             docs_and_similarities = (
                 self.vectorstore.similarity_search_with_relevance_scores(
-                    query, **self.search_kwargs
+                    query, **kwargs
                 )
             )
             docs = [doc for doc, _ in docs_and_similarities]
         elif self.search_type == "mmr":
-            docs = self.vectorstore.max_marginal_relevance_search(
-                query, **self.search_kwargs
-            )
+            docs = self.vectorstore.max_marginal_relevance_search(query, **kwargs)
         else:
             raise ValueError(f"search_type of {self.search_type} not allowed.")
         return docs
 
     async def _aget_relevant_documents(
-        self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+        filter: Optional[Dict[str, Any]] = None,
     ) -> List[Document]:
+        if filter is not None:
+            kwargs = self.search_kwargs.copy()
+            kwargs["filter"] = filter
+        else:
+            kwargs = self.search_kwargs
+
         if self.search_type == "similarity":
-            docs = await self.vectorstore.asimilarity_search(
-                query, **self.search_kwargs
-            )
+            docs = await self.vectorstore.asimilarity_search(query, **kwargs)
         elif self.search_type == "similarity_score_threshold":
             docs_and_similarities = (
                 await self.vectorstore.asimilarity_search_with_relevance_scores(
-                    query, **self.search_kwargs
+                    query, **kwargs
                 )
             )
             docs = [doc for doc, _ in docs_and_similarities]
         elif self.search_type == "mmr":
             docs = await self.vectorstore.amax_marginal_relevance_search(
-                query, **self.search_kwargs
+                query, **kwargs
             )
         else:
             raise ValueError(f"search_type of {self.search_type} not allowed.")
